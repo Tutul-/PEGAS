@@ -71,21 +71,19 @@ SET previousQ TO 0.
 SET broke30s TO FALSE.
 SET turnStart TO ALTITUDE + 100.
 SET turnExponent TO 0.7.
-IF NOT controls:HASKEY("fairingAndLES") {
+IF NOT mission:HASKEY("fairingAndLES") OR NOT mission:HASKEY("fairingAndLESMass") {
 	mission:ADD("fairingAndLES", FALSE).
 }
 IF SHIP:BODY:ATM:EXISTS {
 	SET atmoHeight TO SHIP:BODY:ATM:HEIGHT.
 	SET turnEnd TO atmoHeight * 0.9.
 	// Fairing/LES separation only if activated when mostly out of the atmosphere
-	WHEN controls["fairingAndLES"] IS TRUE AND ALTITUDE > atmoHeight*0.95 THEN {
-		TOGGLE AG0.
+	WHEN mission["fairingAndLES"] IS TRUE AND ALTITUDE > atmoHeight*0.95 THEN {
+		sequence:ADD(LEXICON("time", TIME:SECONDS - liftoffTime:SECONDS + 1, "type", "jettison", "massLost", mission["fairingAndLESMass"])).
 		pushUIMessage("Fairing/LES separation").
 	}.
 	SET controls["upfgActivation"] TO 999. // Recalculate UPFG activation later
 }
-
-// Detect user configured pitching settings and use them instead
 
 //	PEGAS TAKES CONTROL OF THE MISSION
 createUI().
