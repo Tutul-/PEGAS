@@ -18,19 +18,19 @@ SET TERMINAL:HEIGHT TO 26 + 14.	//	Few more lines for debugging
 
 FUNCTION createUI {
 	CLEARSCREEN.
-	PRINT ".-----------------------------------------.".
-	PRINT "| PEGAS                              v1.1 |".
+	PRINT "┌─────────────────────────────────────────┐".
+	PRINT "| PEGAS (gravity assist by Tutul)    v1.2 |".
 	PRINT "| Powered Explicit Guidance Ascent System |".
-	PRINT "|-----------------------------------------|".
+	PRINT "├─────────────────────────────────────────┤".
 	PRINT "| T   h  m  s |                           |".
-	PRINT "|-----------------------------------------|".
+	PRINT "├─────────────────────────────────────────┤".
 	PRINT "|                                         |".
-	PRINT "|-----------------------------------------|".
+	PRINT "├─────────────────────────────────────────┤".
 	PRINT "| Stage:                          (    s) |".
 	PRINT "| UPFG status  =                          |".
 	PRINT "| Throttle     =      %    Tgo =      s   |".
 	PRINT "| Acceleration =      m/s2 Vgo =      m/s |".
-	PRINT "|-----------------------------------------|".
+	PRINT "├─────────────────────────────────────────┤".
 	PRINT "|               Current       Target      |".
 	PRINT "| Altitude    |        km   |        km   |".
 	PRINT "| Velocity    |        m/s  |        m/s  |".
@@ -40,9 +40,9 @@ FUNCTION createUI {
 	PRINT "| Inclination |        deg  |        deg  |".
 	PRINT "| Long. of AN |        deg  |        deg  |".
 	PRINT "| Angle between orbits:       deg         |".
-	PRINT "|-----------------------------------------|".
+	PRINT "├─────────────────────────────────────────┤".
 	PRINT "|                                         |".
-	PRINT "*-----------------------------------------*".
+	PRINT "└─────────────────────────────────────────┘".
 	
 	textPrint(SHIP:NAME, 6, 2, 41, "L").
 	refreshUI().
@@ -214,6 +214,7 @@ FUNCTION refreshUI {
 }
 
 //	Message printing interface
+LOCK MET TO TIME:SECONDS-liftoffTime:SECONDS.
 FUNCTION pushUIMessage {
 	//	Only passes messages into the system. refreshUI does the actual printing.
 	//	If there is a message pending or printed already, an incoming one will be only
@@ -221,6 +222,22 @@ FUNCTION pushUIMessage {
 	DECLARE PARAMETER message.		//	Expects a string.
 	DECLARE PARAMETER ttl IS 5.		//	Message time-to-live (scalar).
 	DECLARE PARAMETER priority IS PRIORITY_NORMAL.
+    
+    IF priority <> PRIORITY_LOW {
+        LOCAL sign IS "".
+        IF MET < 0 {
+            SET sign TO "-".
+        } ELSE {
+            SET sign TO "+".
+        }
+        LOCAL space IS " ".
+        IF ROUND(ABS(MET),0) < 10 {
+            SET space TO "   ".
+        } ELSE IF ROUND(ABS(MET),0) < 100 {
+            SET space TO "  ".
+        }
+        scrollPrint("T"+sign+ROUND(ABS(MET),0)+space+message).
+    }
 	
 	//	If we already have a message - only accept the new one if it's important enough
 	IF uiMessage["received"] {
@@ -238,3 +255,19 @@ FUNCTION pushUIMessage {
 		SET uiMessage["received"] TO TRUE.
 	}
 }
+
+// For scrolling log
+SET printList TO LIST().
+SET maxLinesToPrint TO 13. // Max # of lines in scrolling list
+SET listLineStart TO 26. // First line for print scrolling list
+FUNCTION scrollPrint {
+	DECLARE PARAMETER nextPrint.
+	printList:ADD(nextPrint). 
+	UNTIL printList:LENGTH <= maxLinesToPrint {printList:REMOVE(0).}.
+	LOCAL currentLine IS listLineStart.
+	FOR printLine in printList {
+		PRINT "                                                 " AT (0,currentLine).
+		PRINT printLine AT (0,currentLine).
+		SET currentLine TO currentLine+1.
+	}.
+}.
