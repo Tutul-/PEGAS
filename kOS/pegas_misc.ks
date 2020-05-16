@@ -15,11 +15,17 @@ GLOBAL PRIORITY_CRITICAL IS 3.
 //	Set screen dimensions
 SET TERMINAL:WIDTH TO 43.
 SET TERMINAL:HEIGHT TO 26 + 14.	//	Few more lines for debugging
+//	Keep track of the time relative to launch
+LOCK met TO TIME:SECONDS-liftoffTime:SECONDS.
+// For scrolling log
+SET printList TO LIST().
+SET maxLinesToPrint TO 13. // Max # of lines in scrolling list
+SET listLineStart TO 26. // First line for print scrolling list
 
 FUNCTION createUI {
 	CLEARSCREEN.
 	PRINT ".-----------------------------------------.".
-	PRINT "| PEGAS                              v1.1 |".
+	PRINT "| PEGAS (gravity assist by Tutul)    v1.2 |".
 	PRINT "| Powered Explicit Guidance Ascent System |".
 	PRINT "|-----------------------------------------|".
 	PRINT "| T   h  m  s |                           |".
@@ -222,6 +228,23 @@ FUNCTION pushUIMessage {
 	DECLARE PARAMETER ttl IS 5.		//	Message time-to-live (scalar).
 	DECLARE PARAMETER priority IS PRIORITY_NORMAL.
 	
+	// If priority isn't LOW, we save the message in the logs system with time and sign
+	IF priority <> PRIORITY_LOW {
+		LOCAL sign IS "".
+		IF met < 0 {
+			SET sign TO "-".
+		} ELSE {
+			SET sign TO "+".
+		}
+			LOCAL space IS " ".
+			IF ROUND(ABS(met),0) < 10 {
+				SET space TO "   ".
+			} ELSE IF ROUND(ABS(met),0) < 100 {
+				SET space TO "  ".
+			}
+		scrollPrint("T"+sign+ROUND(ABS(met),0)+space+message).
+	}
+	
 	//	If we already have a message - only accept the new one if it's important enough
 	IF uiMessage["received"] {
 		IF priority >= uiMessage["priority"] {
@@ -238,3 +261,15 @@ FUNCTION pushUIMessage {
 		SET uiMessage["received"] TO TRUE.
 	}
 }
+
+FUNCTION scrollPrint {
+	DECLARE PARAMETER nextPrint.
+	printList:ADD(nextPrint). 
+	UNTIL printList:LENGTH <= maxLinesToPrint {printList:REMOVE(0).}.
+	LOCAL currentLine IS listLineStart.
+	FOR printLine in printList {
+		PRINT "                                                 " AT (0,currentLine).
+		PRINT printLine AT (0,currentLine).
+		SET currentLine TO currentLine+1.
+	}.
+}.
