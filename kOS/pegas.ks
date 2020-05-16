@@ -34,8 +34,8 @@ GLOBAL systemEventFlag IS FALSE.
 GLOBAL userEventPointer IS -1.		//	As above
 GLOBAL userEventFlag IS FALSE.
 GLOBAL commsEventFlag IS FALSE.
-GLOBAL throttleSetting IS 1.		//	This is what actually controls the throttle,
-GLOBAL throttleDisplay IS 1.		//	and this is what to display on the GUI - see throttleControl() for details.
+GLOBAL throttleSetting IS 0.		//	This is what actually controls the throttle,
+GLOBAL throttleDisplay IS 0.		//	and this is what to display on the GUI - see throttleControl() for details.
 GLOBAL steeringVector IS LOOKDIRUP(SHIP:FACING:FOREVECTOR, SHIP:FACING:TOPVECTOR).
 GLOBAL steeringRoll IS 0.
 GLOBAL upfgConverged IS FALSE.
@@ -43,9 +43,6 @@ GLOBAL stagingInProgress IS FALSE.
 
 
 //	PREFLIGHT ACTIVITIES
-//	Click "control from here" on a part that runs the system.
-//	Helpful when your payload is not perfectly rigidly attached, and you're not sure whether it controls the vessel or not.
-CORE:PART:CONTROLFROM().
 //	Update mission struct and set up UPFG target
 missionSetup().
 SET upfgTarget TO targetSetup().
@@ -68,59 +65,144 @@ setUserEvents().		//	Initialize vehicle sequence
 setVehicle().			//	Complete vehicle definition (as given by user)
 setComms(). 			//	Setting up communications
 
+// Atmospheric and gravity turn variable
+SET maxQ TO FALSE.
+SET previousQ TO 0.
+SET broke30s TO FALSE.
+SET turnStart TO ALTITUDE + 100.
+SET turnExponent TO 0.7.
+IF NOT controls:HASKEY("fairingAndLES") {
+	mission:ADD("fairingAndLES", FALSE).
+}
+IF SHIP:BODY:ATM:EXISTS {
+	SET atmoHeight TO SHIP:BODY:ATM:HEIGHT.
+	SET turnEnd TO atmoHeight * 0.9.
+	// Fairing/LES separation only if activated when mostly out of the atmosphere
+	WHEN controls["fairingAndLES"] IS TRUE AND ALTITUDE > atmoHeight*0.95 THEN {
+		TOGGLE AG0.
+		pushUIMessage("Fairing/LES separation").
+	}.
+	SET controls["upfgActivation"] TO 999. // Recalculate UPFG activation later
+}
+
+// Detect user configured pitching settings and use them instead
 
 //	PEGAS TAKES CONTROL OF THE MISSION
 createUI().
 //	Prepare control for vertical ascent
 LOCK THROTTLE TO throttleSetting.
 LOCK STEERING TO steeringVector.
-SET ascentFlag TO 0.	//	0 = vertical, 1 = pitching over, 2 = notify about holding prograde, 3 = just hold prograde
+// -1 = standby (is it really necessary?)
+//  0 = vertical launch to clear the tower or to get high enough before pitching
+//	1 = commence the gravity turn (simple system best suited for atmospheric flight)
+//	2 = hold to prograde and be ready for UPFG initialization
+// 666 is an abort sequence and trigger ABORT system
+SET ascentFlag TO -1.	//	-1 = standy, 0 = vertical, 1 = gravity turn, 2 = hold prograde, 666 = ABORT!
+ON ABORT SET ascentFlag TO 666.
 //	Main loop - wait on launch pad, lift-off and passive guidance
 UNTIL ABORT {
 	//	Sequence handling
 	IF systemEventFlag = TRUE { systemEventHandler(). }
 	IF   userEventFlag = TRUE {   userEventHandler(). }
 	IF  commsEventFlag = TRUE {  commsEventHandler(). }
-	//	Control handling
-	IF ascentFlag = 0 {
-		//	The vehicle is going straight up for given amount of time
-		IF TIME:SECONDS >= liftoffTime:SECONDS + controls["verticalAscentTime"] {
-			//	Then it changes attitude for an initial pitchover "kick"
-			SET steeringVector TO aimAndRoll(HEADING(mission["launchAzimuth"],90-controls["pitchOverAngle"]):VECTOR, steeringRoll).
-			SET ascentFlag TO 1.
-			pushUIMessage( "Pitching over by " + ROUND(controls["pitchOverAngle"],1) + " degrees." ).
+	
+	SET throttleDisplay TO throttleSetting.
+	
+	IF ascentFlag = -1 {
+		// First launch, set throttle to max
+		IF SHIP:MAXTHRUST = 0 { SET throttleSetting TO 1. }
+		SET ascentFlag TO 0.
+	}
+	ELSE IF ascentFlag = 0 {
+		// The vehicle is going straight up for the first meters
+		IF ALTITUDE >= turnStart {
+			IF SHIP:BODY:ATM:EXISTS { SET ascentFlag TO 1. }
+			ELSE { SET ascentFlag TO 2. }
+			textPrint("Gravity turn", 8, 9, 21, "L").
+			pushUIMessage( "Starting gravity turn." ).
 		}
 	}
 	ELSE IF ascentFlag = 1 {
-		//	It keeps this attitude until velocity vector matches it closely
-		IF TIME:SECONDS < liftoffTime:SECONDS + controls["verticalAscentTime"] + 3 {
-			//	Delay this check for the first few seconds to allow the vehicle to pitch away from current prograde
-		} ELSE {
-			//	Attitude must be recalculated at every iteration though
-			SET velocityAngle TO VANG(SHIP:UP:VECTOR, SHIP:VELOCITY:SURFACE).
-			IF controls["pitchOverAngle"] - velocityAngle < 0.1 {
-				SET ascentFlag TO 2.
-			}
+		// Ship throttle control
+		SET throttleSetting TO max(0.1, min(1, 1 - ((SHIP:DYNAMICPRESSURE * 200) / (SHIP:MASS * (SHIP:BODY:MU / (SHIP:BODY:RADIUS + ALTITUDE) ^ 2))))).
+		
+		// Display fake MAXQ informations (only find out at the end of that sequence)
+		IF NOT maxQ AND previousQ > SHIP:DYNAMICPRESSURE {
+			pushUIMessage("Max Q").
+			SET maxQ TO TRUE.
 		}
-		//	As a safety check - do not stay deadlocked in this state for too long (might be unnecessary).
-		IF TIME:SECONDS >= liftoffTime:SECONDS + controls["verticalAscentTime"] + pitchOverTimeLimit {
-			SET ascentFlag TO 2.
-			pushUIMessage( "Pitchover time limit exceeded!", 5, PRIORITY_HIGH ).
+		SET previousQ TO  SHIP:DYNAMICPRESSURE.
+		
+		// Ship pitch control
+		SET trajectoryPitch TO max(90-(((ALTITUDE-turnStart)/(turnEnd-turnStart))^turnExponent*90),0).
+		SET steerPitch TO trajectoryPitch.
+		
+		//Keep time to apoapsis > 30s during ascent once it is above 30s
+		IF broke30s AND ETA:APOAPSIS < 30 SET steerPitch TO steerPitch+(30-ETA:APOAPSIS).
+		ELSE IF ETA:APOAPSIS > 30 AND NOT broke30s SET broke30s TO TRUE.
+		
+		// Ship compass heading control
+		IF ABS(SHIP:OBT:INCLINATION - ABS(mission["inclination"])) > 2 {
+			SET steerHeading TO mission["launchAzimuth"].
+		}
+		ELSE { // Feedback loop once close to desired inclination
+			IF mission["inclination"] >= 0 {
+				IF VANG(VXCL(SHIP:UP:VECTOR, SHIP:FACING:VECTOR), SHIP:NORTH:VECTOR) <= 90 {
+					SET steerHeading TO (90-mission["inclination"]) - 2*(ABS(mission["inclination"]) - SHIP:OBT:INCLINATION).
+				}
+				ELSE {
+					SET steerHeading TO (90-mission["inclination"]) + 2*(ABS(mission["inclination"]) - SHIP:OBT:INCLINATION).
+				}.
+			}
+			ELSE IF mission["inclination"] < 0 {
+				SET steerHeading TO (90-mission["inclination"]) + 2*(ABS(mission["inclination"]) - SHIP:OBT:INCLINATION).
+			}.
+		}.
+		
+		SET ascentSteer TO HEADING(steerHeading, steerPitch).
+		
+		// Don't pitch too far off surface prograde while under high dynamic pressure
+		IF SHIP:Q > 0 SET angleLimit TO MAX(3, MIN(90, 5*LN(0.9/SHIP:Q))).
+		ELSE SET angleLimit TO 90.
+		SET angleToPrograde TO VANG(SHIP:SRFPROGRADE:VECTOR,ascentSteer:VECTOR).
+		IF angleToPrograde > angleLimit {
+			SET ascentSteerLimited TO (angleLimit/angleToPrograde * (ascentSteer:VECTOR:NORMALIZED - SHIP:SRFPROGRADE:VECTOR:NORMALIZED)) + SHIP:SRFPROGRADE:VECTOR:NORMALIZED.
+			SET ascentSteer TO ascentSteerLimited:DIRECTION.
+		}.
+		SET steeringVector TO ascentSteer.
+	
+		IF SHIP:VERTICALSPEED > 0 AND (liftoffTime:SECONDS + controls["upfgActivation"]) > 30 {
+			LOCAL upfgDelay IS ((turnEnd * 0.9) / SHIP:VERTICALSPEED).
+			IF upfgDelay < controls["upfgActivation"] { SET controls["upfgActivation"] TO upfgDelay. }
 		}
 	}
 	ELSE IF ascentFlag = 2 {
-		//	We cannot blindly hold prograde though, because this will provide no azimuth control
-		//	Much better option is to read current velocity angle and aim for that, but correct for azimuth
 		SET velocityAngle TO 90-VANG(SHIP:UP:VECTOR, SHIP:VELOCITY:SURFACE).
 		SET steeringVector TO aimAndRoll(HEADING(mission["launchAzimuth"],velocityAngle):VECTOR, steeringRoll).
-		//	There are two almost identical cases, in the first we set the initial message, in the next we just keep attitude.
-		pushUIMessage( "Holding prograde at " + ROUND(mission["launchAzimuth"],1) + " deg azimuth." ).
-		SET ascentFlag TO 3.
+		pushUIMessage("Holding prograde at " + ROUND(mission["launchAzimuth"],1) + " deg azimuth.", 1, PRIORITY_LOW).
 	}
-	ELSE {
-		SET velocityAngle TO 90-VANG(SHIP:UP:VECTOR, SHIP:VELOCITY:SURFACE).
-		SET steeringVector TO aimAndRoll(HEADING(mission["launchAzimuth"],velocityAngle):VECTOR, steeringRoll).
+	ELSE IF ascentFlag = 666 {
+		UNLOCK STEERING.
+		UNLOCK THROTTLE.
+		SET SHIP:CONTROL:PILOTMAINTHROTTLE TO 0.
+		TOGGLE ABORT.
+		pushUIMessage("~~~~~Launch aborted!~~~~~", 10, PRIORITY_HIGH).
+		HUDTEXT("Launch Aborted!",5,2,100,RED,False).
+		BREAK.
 	}
+	
+	// Angle to desired steering > 45deg (i.e. steering control loss)
+	IF VANG(SHIP:FACING:VECTOR, steeringVector:VECTOR) > 45 AND TIME:SECONDS >= liftoffTime:SECONDS + 5 {
+		SET ascentFlag TO 666.
+		pushUIMessage("Ship lost steering control!").
+	}
+	
+	// Abort if falling back toward surface (i.e. insufficient thrust)
+	IF SHIP:VERTICALSPEED < -1.0 AND TIME:SECONDS >= liftoffTime:SECONDS + 5 {
+		SET ascentFlag TO 666.
+		pushUIMessage("Insufficient vertical velocity!").
+	}
+	
 	//	The passive guidance loop ends a few seconds before actual ignition of the first UPFG-controlled stage.
 	//	This is to give UPFG time to converge. Actual ignition occurs via stagingEvents.
 	IF TIME:SECONDS >= liftoffTime:SECONDS + controls["upfgActivation"] - upfgConvergenceDelay {
@@ -161,7 +243,7 @@ UNTIL ABORT {
 	WAIT 0.
 }
 //	Final orbital insertion loop
-pushUIMessage( "Holding attitude for burn finalization!" ).
+pushUIMessage( "Holding attitude: burn finalization!" ).
 SET previousTime TO TIME:SECONDS.
 UNTIL ABORT {
 	LOCAL finalizeDT IS TIME:SECONDS - previousTime.
