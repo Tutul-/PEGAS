@@ -10,11 +10,8 @@ List of possible keys:
 Key                | Units | Opt/req  | Meaning
 ---                | ---   | ---      | ---
 launchTimeAdvance  | s     | required | Launch time will be scheduled that many seconds before the launch site rotates directly under the target orbit
-verticalAscentTime | s     | required | After liftoff, vehicle will fly straight up for that many seconds before pitching over
-pitchOverAngle     | deg   | required | Vehicle will pitch over by that many degrees away from vertical
-upfgActivation     | s     | required | The active guidance phase will be activated that many seconds after liftoff
+upfgActivation     | s     | required | The active guidance phase will be activated that many seconds after liftoff or will be used by the gravity turn estimation
 launchAzimuth      | deg   | optional | Overrides automatic launch azimuth calculation, giving some basic optimization capability\*
-initialRoll        | deg   | optional | Angle to which the vehicle will roll during the initial pitchover maneuver (default is 0)
 
 \* - see notes to [`mission`](#mission) struct.
 
@@ -117,15 +114,17 @@ Variable of type `LEXICON`.
 Defines the target orbit.
 PEGAS allows launch to an orbit specified by selecting a target in the universe map, which allows you to enter only some of the keys.
 
-Key         | Type/units | Meaning
----         | ---        | ---
-payload     | kg         | **Optional**. Mass of the payload, that will be added to mass of each guided stage.
-apoapsis    | km         | Desired apoapsis above sea level.
-periapsis   | km         | Desired periapsis above sea level.
-altitude    | km         | **Optional**. Desired cutoff altitude above sea level. If not specified, will be set to periapsis.
-inclination | deg        | **Optional**. Inclination of the target orbit. When not given, will be set to launch site latitude (absolute).
-LAN         | deg        | **Optional**. Longitude of ascending node of the target orbit. When not given, will be calculated for an instantaneous launch.
-direction   | `string`   | **Optional**. Direction of launch. Allowed values: `north`, `south`, `nearest`. By default it is `nearest`.
+Key               | Type/units | Meaning
+---               | ---        | ---
+payload           | kg         | **Optional**. Mass of the payload, that will be added to mass of each guided stage.
+apoapsis          | km         | Desired apoapsis above sea level.
+periapsis         | km         | Desired periapsis above sea level.
+altitude          | km         | **Optional**. Desired cutoff altitude above sea level. If not specified, will be set to periapsis.
+inclination       | deg        | **Optional**. Inclination of the target orbit. When not given, will be set to launch site latitude (absolute).
+LAN               | deg        | **Optional**. Longitude of ascending node of the target orbit. When not given, will be calculated for an instantaneous launch.
+direction         | `string`   | **Optional**. Direction of launch. Allowed values: `north`, `south`, `nearest`. By default it is `nearest`.
+fairingAndLES     | `boolean`  | **Optional**. Activate the automatic fairing/LES jettison when the rocket reach the upper limit of the atmosphere.
+fairingAndLESMass | `scalar`   | **Used only if** `"fairingAndLES"` **is** `TRUE`. Informs the system of mass amount lost in the process.
 
 In case of selecting target from the map, `inclination` and `LAN` will be overwritten from the target data, but apoapsis and periapsis will not.  
 Inclination can be omitted - it will be then set to the launch site latitude *magnitude*.
