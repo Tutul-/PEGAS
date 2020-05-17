@@ -62,11 +62,11 @@ setVehicle().			//	Complete vehicle definition (as given by user)
 setComms(). 			//	Setting up communications
 
 // Atmospheric and gravity turn variable
+SET turnStart TO ALTITUDE + 100.
 IF SHIP:BODY:ATM:EXISTS {
 	SET maxQ TO FALSE.
 	SET previousQ TO 0.
 	SET broke30s TO FALSE.
-	SET turnStart TO ALTITUDE + 100.
 	SET turnExponent TO 0.7.
 	SET atmoHeight TO SHIP:BODY:ATM:HEIGHT.
 	SET turnEnd TO atmoHeight * 0.9.
@@ -96,7 +96,7 @@ UNTIL ABORT {
 	
 	IF ascentFlag = -1 {
 		// First launch, set throttle to max
-		IF SHIP:MAXTHRUST = 0 { SET throttleSetting TO 1. }
+		IF SHIP:MAXTHRUST = 0 OR NOT SHIP:BODY:ATM:EXISTS { SET throttleSetting TO 1. }
 		SET ascentFlag TO 0.
 	}
 	ELSE IF ascentFlag = 0 {
@@ -109,15 +109,17 @@ UNTIL ABORT {
 		}
 	}
 	ELSE IF ascentFlag = 1 {
-		// Ship throttle control
-		SET throttleSetting TO max(0.1, min(1, 1 - ((SHIP:DYNAMICPRESSURE * 200) / (SHIP:MASS * (SHIP:BODY:MU / (SHIP:BODY:RADIUS + ALTITUDE) ^ 2))))).
-		
-		// Display fake MAXQ informations (only find out at the end of that sequence)
-		IF NOT maxQ AND previousQ > SHIP:DYNAMICPRESSURE {
-			pushUIMessage("Max Q").
-			SET maxQ TO TRUE.
+		IF SHIP:BODY:ATM:EXISTS {
+			// Ship throttle control with pressure control
+			SET throttleSetting TO max(0.1, min(1, 1 - ((SHIP:DYNAMICPRESSURE * 200) / (SHIP:MASS * (SHIP:BODY:MU / (SHIP:BODY:RADIUS + ALTITUDE) ^ 2))))).
+			
+			// Display fake MAXQ informations (only find out at the end of that sequence)
+			IF NOT maxQ AND previousQ > SHIP:DYNAMICPRESSURE {
+				pushUIMessage("Max Q").
+				SET maxQ TO TRUE.
+			}
+			SET previousQ TO  SHIP:DYNAMICPRESSURE.
 		}
-		SET previousQ TO  SHIP:DYNAMICPRESSURE.
 		
 		// Ship pitch control
 		SET trajectoryPitch TO max(90-(((ALTITUDE-turnStart)/(turnEnd-turnStart))^turnExponent*90),0).
