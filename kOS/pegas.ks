@@ -55,10 +55,6 @@ IF timeToOrbitIntercept < controls["launchTimeAdvance"] { SET liftoffTime TO lif
 IF NOT mission:HASKEY("launchAzimuth") {
 	mission:ADD("launchAzimuth", launchAzimuth()).
 }
-//	Read initial roll angle (to be executed during the pitchover maneuver)
-IF controls:HASKEY("initialRoll") {
-	SET steeringRoll TO controls["initialRoll"].
-}
 //	Set up the system for flight
 setSystemEvents().		//	Set up countdown messages
 setUserEvents().		//	Initialize vehicle sequence
@@ -71,15 +67,18 @@ SET previousQ TO 0.
 SET broke30s TO FALSE.
 SET turnStart TO ALTITUDE + 100.
 SET turnExponent TO 0.7.
-IF NOT mission:HASKEY("fairingAndLES") OR NOT mission:HASKEY("fairingAndLESMass") {
-	mission:ADD("fairingAndLES", FALSE).
-}
 IF SHIP:BODY:ATM:EXISTS {
 	SET atmoHeight TO SHIP:BODY:ATM:HEIGHT.
 	SET turnEnd TO atmoHeight * 0.9.
+	IF NOT mission:HASKEY("fairingAndLES") OR NOT mission:HASKEY("fairingAndLESMass") {
+		mission:ADD("fairingAndLES", FALSE).
+	}
+	ELSE IF mission["fairingAndLES"] {
+		pushUIMessage("Fairing/LES configured", 1, PRIORITY_LOW).
+	}
 	// Fairing/LES separation only if activated when mostly out of the atmosphere
-	WHEN mission["fairingAndLES"] IS TRUE AND ALTITUDE > atmoHeight*0.95 THEN {
-		sequence:ADD(LEXICON("time", TIME:SECONDS - liftoffTime:SECONDS + 1, "type", "jettison", "massLost", mission["fairingAndLESMass"])).
+	WHEN mission["fairingAndLES"] AND ALTITUDE > atmoHeight*0.95 THEN {
+		sequence:ADD(LEXICON("time", TIME:SECONDS - liftoffTime:SECONDS + 1, "type", "_fairing", "massLost", mission["fairingAndLESMass"])).
 		pushUIMessage("Fairing/LES separation").
 	}.
 	SET controls["upfgActivation"] TO 999. // Recalculate UPFG activation later
@@ -184,27 +183,25 @@ UNTIL ABORT {
 		UNLOCK THROTTLE.
 		SET SHIP:CONTROL:PILOTMAINTHROTTLE TO 0.
 		TOGGLE ABORT.
-		pushUIMessage("~~~~~Launch aborted!~~~~~", 10, PRIORITY_HIGH).
-		HUDTEXT("Launch Aborted!",5,2,100,RED,False).
 		BREAK.
 	}
 	
-	// Angle to desired steering > 45deg (i.e. steering control loss)
-	IF VANG(SHIP:FACING:VECTOR, steeringVector:VECTOR) > 45 AND TIME:SECONDS >= liftoffTime:SECONDS + 5 {
+	// Angle to desired steering > 30deg (i.e. steering control loss)
+	IF VANG(SHIP:FACING:VECTOR, steeringVector:VECTOR) > 30 AND TIME:SECONDS >= liftoffTime:SECONDS + 5 {
 		SET ascentFlag TO 666.
-		pushUIMessage("Ship lost steering control!").
+		pushUIMessage("Ship lost steering control!", 10, PRIORITY_HIGH).
 	}
 	
 	// Abort if falling back toward surface (i.e. insufficient thrust)
 	IF SHIP:VERTICALSPEED < -1.0 AND TIME:SECONDS >= liftoffTime:SECONDS + 5 {
 		SET ascentFlag TO 666.
-		pushUIMessage("Insufficient vertical velocity!").
+		pushUIMessage("Insufficient vertical velocity!", 10, PRIORITY_HIGH).
 	}
 	
 	//	The passive guidance loop ends a few seconds before actual ignition of the first UPFG-controlled stage.
 	//	This is to give UPFG time to converge. Actual ignition occurs via stagingEvents.
 	IF TIME:SECONDS >= liftoffTime:SECONDS + controls["upfgActivation"] - upfgConvergenceDelay {
-		pushUIMessage( "Initiating UPFG!" ).
+		pushUIMessage( "Initiating UPFG..." ).
 		BREAK.
 	}
 	//	UI - recalculate UPFG target solely for printing relative angle
@@ -215,11 +212,13 @@ UNTIL ABORT {
 
 
 //	ACTIVE GUIDANCE
-createUI().
-//	Initialize UPFG
-initializeVehicle().
-SET upfgState TO acquireState().
-SET upfgInternal TO setupUPFG().
+IF NOT ABORT {
+	createUI().
+	//	Initialize UPFG
+	initializeVehicle().
+	SET upfgState TO acquireState().
+	SET upfgInternal TO setupUPFG().
+}
 //	Main loop - iterate UPFG (respective function controls attitude directly)
 UNTIL ABORT {
 	//	Sequence handling
@@ -241,8 +240,10 @@ UNTIL ABORT {
 	WAIT 0.
 }
 //	Final orbital insertion loop
-pushUIMessage( "Holding attitude: burn finalization!" ).
-SET previousTime TO TIME:SECONDS.
+IF NOT ABORT {
+	pushUIMessage( "Holding attitude: burn finalization!" ).
+	SET previousTime TO TIME:SECONDS.
+}
 UNTIL ABORT {
 	LOCAL finalizeDT IS TIME:SECONDS - previousTime.
 	SET previousTime TO TIME:SECONDS.
@@ -259,5 +260,12 @@ UNLOCK STEERING.
 UNLOCK THROTTLE.
 SET SHIP:CONTROL:PILOTMAINTHROTTLE TO 0.
 WAIT 0.
-missionValidation().
+IF NOT ABORT {
+	missionValidation().
+}
+ELSE {
+	pushUIMessage("~~~~~Launch aborted!~~~~~").
+	HUDTEXT("Launch Aborted!",5,2,100,RED,False).
+}
 refreshUI().
+WAIT 0.
