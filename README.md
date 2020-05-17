@@ -16,7 +16,20 @@ Short list of what PEGAS is capable of:
 
 More info on my KSP [forum thread](http://forum.kerbalspaceprogram.com/index.php?/topic/142213-pegas-powered-explicit-guidance-ascent-system-devlog/), also see my [prototype repository](https://github.com/Noiredd/PEGAS-MATLAB).
 
-## **[Version 1.1 is here!](https://github.com/Noiredd/PEGAS/releases/tag/v1.1)**
+## **[Version 1.1 is here!](https://github.com/Noiredd/PEGAS/releases/tag/v1.1) <== ORIGINAL**
+## **[Version 1.1b is here!](https://codeload.github.com/Tutul-/PEGAS/zip/v1.1b) <== CUSTOM**
+
+### What's different from the original script from [Noiredd](https://github.com/Noiredd/PEGAS) ?
+
+* The script remove the need for pitching/rolling at launch and provide a basic gravity turn for atmospheric and vacuum flight (only tested on Kerbin with/without atmospheric effect)
+* A new logs system has been added to provide you with a scrolling history with timestamp (relative to the launch event)
+* For atmospheric flight, no need to worry about the UPFG activation timer. The script estimate when to start it for you during the flight (the countdown will become more precise as you approach it's best starting point)
+* Advanced abort system inspired that work with user input or with automatic security:
+  * Lost of steering control
+  * Not enough thrust and negative vertical speed
+  * Explosion/failling pieces are detected (manual STAGE trigger that one too!)
+
+Original code are credited to [Noiredd](https://github.com/Noiredd/PEGAS) where abort system and part of the new early ascent code are credited to [/u/only_to_downvote](https://github.com/mileshatem/launchToCirc)
 
 ### How to use
 1. Make sure you have [kOS](http://forum.kerbalspaceprogram.com/index.php?/topic/61827-122-kos-scriptable-autopilot-system-v103-20161207/) installed. Note: [basic](http://ksp-kos.github.io/KOS_DOC/language.html) knowledge of kOS will be very handy.

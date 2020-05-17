@@ -114,17 +114,15 @@ Variable of type `LEXICON`.
 Defines the target orbit.
 PEGAS allows launch to an orbit specified by selecting a target in the universe map, which allows you to enter only some of the keys.
 
-Key               | Type/units | Meaning
----               | ---        | ---
-payload           | kg         | **Optional**. Mass of the payload, that will be added to mass of each guided stage.
-apoapsis          | km         | Desired apoapsis above sea level.
-periapsis         | km         | Desired periapsis above sea level.
-altitude          | km         | **Optional**. Desired cutoff altitude above sea level. If not specified, will be set to periapsis.
-inclination       | deg        | **Optional**. Inclination of the target orbit. When not given, will be set to launch site latitude (absolute).
-LAN               | deg        | **Optional**. Longitude of ascending node of the target orbit. When not given, will be calculated for an instantaneous launch.
-direction         | `string`   | **Optional**. Direction of launch. Allowed values: `north`, `south`, `nearest`. By default it is `nearest`.
-fairingAndLES     | `boolean`  | **Optional**. Activate the automatic fairing/LES jettison when the rocket reach the upper limit of the atmosphere.
-fairingAndLESMass | `scalar`   | **Used only if** `"fairingAndLES"` **is** `TRUE`. Informs the system of mass amount lost in the process.
+Key         | Type/units | Meaning
+---         | ---        | ---
+payload     | kg         | **Optional**. Mass of the payload, that will be added to mass of each guided stage.
+apoapsis    | km         | Desired apoapsis above sea level.
+periapsis   | km         | Desired periapsis above sea level.
+altitude    | km         | **Optional**. Desired cutoff altitude above sea level. If not specified, will be set to periapsis.
+inclination | deg        | **Optional**. Inclination of the target orbit. When not given, will be set to launch site latitude (absolute).
+LAN         | deg        | **Optional**. Longitude of ascending node of the target orbit. When not given, will be calculated for an instantaneous launch.
+direction   | `string`   | **Optional**. Direction of launch. Allowed values: `north`, `south`, `nearest`. By default it is `nearest`.
 
 In case of selecting target from the map, `inclination` and `LAN` will be overwritten from the target data, but apoapsis and periapsis will not.  
 Inclination can be omitted - it will be then set to the launch site latitude *magnitude*.
