@@ -589,6 +589,18 @@ FUNCTION initializeVehicle {
 	stageEventHandler(currentTime).	//	Schedule ignition of the first UPFG-controlled stage.
 }
 
+//	Detect and abort on explosion or breaking appart (or user-stage actions).
+SET canAbort TO FALSE.
+SET partsCount TO SHIP:PARTS:LENGTH.
+WHEN canAbort AND NOT stagingInProgress AND SHIP:PARTS:LENGTH < partsCount THEN  {
+		pushUIMessage("Ship breaking appart!", 10, PRIORITY_HIGH).
+		ABORT ON.
+}
+FUNCTION updateExplosionDetector {
+	SET partsCount TO SHIP:PARTS:LENGTH.
+	SET canAbort TO TRUE.
+}
+
 //	Executes a system event. Currently only supports message printing.
 FUNCTION systemEventHandler {
 	//	Local function needed here, so we can safely exit the handler on first run without excessive nesting
@@ -633,6 +645,9 @@ FUNCTION userEventHandler {
 		setNextEvent().
 		RETURN.
 	}
+	
+	// Disable the explosion detection
+	SET canAbort TO FALSE.
 	
 	//	Handle event
 	LOCAL eType IS sequence[userEventPointer]["type"].
@@ -706,6 +721,9 @@ FUNCTION userEventHandler {
 	
 	//	Create new event trigger
 	setNextEvent().
+	
+	// Update and re-enable the explosion detection
+	updateExplosionDetector().
 }
 
 //	Executes an automatic staging event. Spawns additional triggers.
@@ -770,6 +788,7 @@ FUNCTION stageEventHandler {
 			GLOBAL engineIgnitionTime IS currentTime + eventDelay + event["ullageBurnDuration"].
 			WHEN TIME:SECONDS >= engineIgnitionTime THEN {	STAGE.
 															SET stagingInProgress TO FALSE.
+															updateExplosionDetector().
 															pushUIMessage(stageName + " - ignition"). }
 			SET eventDelay TO eventDelay + event["ullageBurnDuration"].
 			GLOBAL ullageShutdownTime IS currentTime + eventDelay + event["postUllageBurn"].
@@ -784,18 +803,21 @@ FUNCTION stageEventHandler {
 			GLOBAL engineIgnitionTime IS currentTime + eventDelay + event["ullageBurnDuration"].
 			WHEN TIME:SECONDS >= engineIgnitionTime THEN {	STAGE.
 															SET stagingInProgress TO FALSE.
+															updateExplosionDetector().
 															pushUIMessage(stageName + " - ignition"). }
 			SET eventDelay TO eventDelay + event["ullageBurnDuration"].
 		} ELSE IF event["ullage"] = "none" {
 			GLOBAL engineIgnitionTime IS currentTime + eventDelay + event["waitBeforeIgnition"].
 			WHEN TIME:SECONDS >= engineIgnitionTime THEN {	STAGE.
 															SET stagingInProgress TO FALSE.
+															updateExplosionDetector().
 															pushUIMessage(stageName + " - ignition"). }
 			SET eventDelay TO eventDelay + event["waitBeforeIgnition"].
 		} ELSE { pushUIMessage( "Unknown event type (" + event["ullage"] + ")!", 5, PRIORITY_HIGH ). }
 	} ELSE {
 		//	If this event does not need ignition, staging is over at this moment
 		SET stagingInProgress TO FALSE.
+		updateExplosionDetector().
 	}
 	pushUIMessage(stageName + " - activation").
 	
