@@ -62,25 +62,14 @@ setVehicle().			//	Complete vehicle definition (as given by user)
 setComms(). 			//	Setting up communications
 
 // Atmospheric and gravity turn variable
-SET maxQ TO FALSE.
-SET previousQ TO 0.
-SET broke30s TO FALSE.
-SET turnStart TO ALTITUDE + 100.
-SET turnExponent TO 0.7.
 IF SHIP:BODY:ATM:EXISTS {
+	SET maxQ TO FALSE.
+	SET previousQ TO 0.
+	SET broke30s TO FALSE.
+	SET turnStart TO ALTITUDE + 100.
+	SET turnExponent TO 0.7.
 	SET atmoHeight TO SHIP:BODY:ATM:HEIGHT.
 	SET turnEnd TO atmoHeight * 0.9.
-	IF NOT mission:HASKEY("fairingAndLES") OR NOT mission:HASKEY("fairingAndLESMass") {
-		mission:ADD("fairingAndLES", FALSE).
-	}
-	ELSE IF mission["fairingAndLES"] {
-		pushUIMessage("Fairing/LES configured", 1, PRIORITY_LOW).
-	}
-	// Fairing/LES separation only if activated when mostly out of the atmosphere
-	WHEN mission["fairingAndLES"] AND ALTITUDE > atmoHeight*0.95 THEN {
-		sequence:ADD(LEXICON("time", TIME:SECONDS - liftoffTime:SECONDS + 1, "type", "_fairing", "massLost", mission["fairingAndLESMass"])).
-		pushUIMessage("Fairing/LES separation").
-	}.
 	SET controls["upfgActivation"] TO 999. // Recalculate UPFG activation later
 }
 

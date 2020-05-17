@@ -638,7 +638,7 @@ FUNCTION userEventHandler {
 	LOCAL eType IS sequence[userEventPointer]["type"].
 	IF      eType = "print" OR eType = "p" { }
 	ELSE IF eType = "stage" OR eType = "s" { STAGE. }
-	ELSE IF eType = "jettison" OR eType = "j" OR eType = "_fairing" {
+	ELSE IF eType = "jettison" OR eType = "j" {
 		//	Jettisoning some mass results in change of vehicle dynamics. The following mechanism allows the system to
 		//	deal with this loss, which otherwise would have negative effects on constant-acceleration stages.
 		//	The jettisoned mass is subtracted from the current stage's mass (dry and total), and all subsequent stages'
@@ -669,8 +669,8 @@ FUNCTION userEventHandler {
 			//	Exit the loop if the subsequent stage separates (either via staging or ignition)
 			IF (i+1 < vehicle:LENGTH) AND (vehicle[i+1]["staging"]["jettison"] OR vehicle[i+1]["staging"]["ignition"]) { BREAK. }
 		}
-		//	Finally, stage (or AG10 if fairing/LES special case)
-		IF eType = "_fairing" { AG10 ON. } ELSE { STAGE. }
+		//	Finally, stage
+		STAGE.
 	}
 	ELSE IF eType = "throttle" OR eType = "t" {
 		//	Throttling is only allowed during the passive guidance phase, as it would ruin burn time predictions used by
