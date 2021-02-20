@@ -54,14 +54,14 @@ setVehicle().			//	Complete vehicle definition (as given by user)
 setComms(). 			//	Setting up communications
 
 // Atmospheric and gravity turn variable
-SET turnStart TO ALTITUDE + 100.
+SET turnStart TO ALTITUDE + 250.
 IF SHIP:BODY:ATM:EXISTS {
 	SET maxQ TO FALSE.
-	SET previousQ TO 0.
+	SET throttleQ TO TRUE.
+	SET previousQ TO 0.0.
 	SET broke30s TO FALSE.
-	SET turnExponent TO 0.7.
-	SET atmoHeight TO SHIP:BODY:ATM:HEIGHT.
-	SET turnEnd TO atmoHeight * 0.9.
+	SET turnExponent TO 0.5.
+	SET turnEnd TO SHIP:BODY:ATM:HEIGHT * 0.95.
 	SET controls["upfgActivation"] TO 999. // Recalculate UPFG activation later
 }
 
@@ -103,14 +103,22 @@ UNTIL ABORT {
 	ELSE IF ascentFlag = 1 {
 		IF SHIP:BODY:ATM:EXISTS {
 			// Ship throttle control with pressure control
-			SET throttleSetting TO max(0.1, min(1, 1 - ((SHIP:DYNAMICPRESSURE * 200) / (SHIP:MASS * (SHIP:BODY:MU / (SHIP:BODY:RADIUS + ALTITUDE) ^ 2))))).
+			IF throttleQ {
+				SET throttleSetting TO max(0.1, min(1, 1 - ((SHIP:Q * CONSTANT:AtmToKpa) / (SHIP:MASS * (SHIP:BODY:MU / (SHIP:BODY:RADIUS + ALTITUDE) ^ 2))))).
+			}
 			
-			// Display fake MAXQ informations (only find out at the end of that sequence)
-			IF NOT maxQ AND previousQ > SHIP:DYNAMICPRESSURE {
+			// Display fake MAXQ informations
+			IF NOT maxQ AND SHIP:Q < (previousQ * 1.01) {
 				pushUIMessage("Max Q").
 				SET maxQ TO TRUE.
+				SET previousQ TO SHIP:Q. // Become MAXQ value
+			} ELSE IF NOT maxQ {
+				SET previousQ TO SHIP:Q.
+			} ELSE IF maxQ AND SHIP:Q < (previousQ * 0.75) {
+				SET throttleQ TO FALSE.
+				SET throttleSetting TO 1.
+				pushUIMessage("Throlling back to full").
 			}
-			SET previousQ TO  SHIP:DYNAMICPRESSURE.
 		}
 		
 		// Ship pitch control
@@ -152,7 +160,7 @@ UNTIL ABORT {
 		SET steeringVector TO ascentSteer.
 	
 		IF SHIP:VERTICALSPEED > 0 AND (liftoffTime:SECONDS + controls["upfgActivation"]) > 30 {
-			LOCAL upfgDelay IS ((turnEnd * 0.9) / SHIP:VERTICALSPEED).
+			LOCAL upfgDelay IS ((turnEnd * 1.5) / SHIP:VERTICALSPEED).
 			IF upfgDelay < controls["upfgActivation"] { SET controls["upfgActivation"] TO upfgDelay. }
 		}
 	}
@@ -251,4 +259,5 @@ ELSE {
 	HUDTEXT("Launch Aborted!",5,2,100,RED,False).
 }
 refreshUI().
+pushUIMessage("Done", 1, PRIORITY_LOW).
 WAIT 0.
