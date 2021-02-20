@@ -17,7 +17,7 @@ Short list of what PEGAS is capable of:
 More info on my KSP [forum thread](http://forum.kerbalspaceprogram.com/index.php?/topic/142213-pegas-powered-explicit-guidance-ascent-system-devlog/), also see my [prototype repository](https://github.com/Noiredd/PEGAS-MATLAB).
 
 ## **[Version 1.2 is here!](https://github.com/Noiredd/PEGAS/releases/tag/v1.2) <== ORIGINAL**
-## **[Version 1.1b is here!](https://github.com/Tutul-/PEGAS/releases/tag/v1.2b) <== CUSTOM**
+## **[Version 1.2b is here!](https://github.com/Tutul-/PEGAS/releases/tag/v1.2b) <== CUSTOM**
 
 ### What's different from the original script from [Noiredd](https://github.com/Noiredd/PEGAS) ?
 
