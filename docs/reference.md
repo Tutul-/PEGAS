@@ -1,4 +1,11 @@
 ## Structure reference
+Jump to:
+* [`controls`](#controls)
+* [`vehicle`](#vehicle)
+* [`engines`](#engines)
+* [`staging`](#staging)
+* [`sequence`](#sequence)
+* [communications](#communication-module)
 
 ### Controls
 `GLOBAL controls IS LEXICON().`
@@ -25,11 +32,11 @@ The following table gives list of all possible keys each element of the list can
 Key              | Type/units | Opt/req   | Meaning
 ---              | ---        | ---       | ---
 name             | `string`   | required  | Name of the stage that will be printed in the terminal
-massTotal        | kg         | optional* | Total mass of the **entire vehicle** at the moment of ignition of this stage
-massFuel         | kg         | optional* | Mass of the fuel in this stage at the moment of ignition
-massDry          | kg         | optional* | `massTotal` - `massDry`
+massTotal        | kg         | optional\* | Total mass of the **entire vehicle** at the moment of ignition of this stage
+massFuel         | kg         | optional\* | Mass of the fuel in this stage at the moment of ignition
+massDry          | kg         | optional\* | `massTotal` - `massDry`
 gLim             | G          | optional  | Acceleration limit to be imposed on this stage (requires throttling engines)
-minThrottle      | (0.0-1.0)  | optional**| Minimum possible throttle of this stage's engines (for Realism Overhaul)
+minThrottle      | (0.0-1.0)  | optional\*\*| Minimum possible throttle of this stage's engines (for Realism Overhaul)
 throttle         | (0.0-1.0)  | optional  | Nominal throttle for this stage's engines (default = 1.0)
 shutdownRequired | `boolean`  | optional  | Do this stage's engines need explicit shutdown upon activation of the next stage?\*\*\*
 engines          | `list`     | required  | Parameters of each engine in the stage (details further)
@@ -42,7 +49,7 @@ The purpose of this option was to enable controlling vehicles with reusable boos
 PEGAS by default would not shut its engines, potentially causing a collision during separation.
 Setting this flag to `TRUE` overrides this behavior, causing PEGAS to shutdown the booster's engines before staging.
 
-##### Engines
+#### Engines
 Key of type `LIST` containing `LEXICON`s.
 Each element contains parameters of one engine in a following way:
 
@@ -57,7 +64,7 @@ The only thing you need to do is input the combined thrust of all engines.
 For example, a single engine version of the Centaur upper stage, would look like `LEXICON("isp",422,"thrust",67000)`.
 A double engine version can be easily created by writing: `LEXICON("isp",422,"thrust",2*67000)`.
 
-##### Staging
+#### Staging
 Key of type `LEXICON`.
 Defines means of activation of *this* stage, optionally also separation of the *previous* one.
 
@@ -92,6 +99,7 @@ message  | `string`   | Optional\*. Message that will be printed in the terminal
 throttle | `scalar`   | **Used only if** `type` **is** `"throttle"`. Desired throttle setting, value in range \[0-1\].
 massLost | `scalar`   | **Used only if** `type` **is** `"jettison"`. Informs the system of mass amount lost in the process.
 angle    | `scalar`   | **Used only if** `type` **is** `"roll"`. New roll angle.
+function | [`KOSDelegate`](http://ksp-kos.github.io/KOS_DOC/structures/misc/kosdelegate.html#structure:KOSDELEGATE) | **Used only if** `type` **is** `"delegate"`. Function to be called. Shall expect no arguments.
 
 \* - for events of type `throttle` and `roll` message will be automatically generated.
 
@@ -104,6 +112,7 @@ stage    | s       | Hits spacebar (a single `STAGE.` command in kOS).
 jettison | j       | Like `stage` but accounts for the mass lost during the event (subtracting the value under `massLost` key).
 throttle | t       | Sets the throttle to given value (`throttle` key) - only works during the passive guidance phase.
 roll     | r       | Changes the roll component of vehicle attitude (pitch and yaw are dynamically calculated).
+delegate | d       | Calls a function passed as a [kOS delegate](http://ksp-kos.github.io/KOS_DOC/language/delegates.html).
 
 \* - can be used instead of the full event type name.
 
